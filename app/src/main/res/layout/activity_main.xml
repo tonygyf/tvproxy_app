@@ -48,6 +48,9 @@
             android:hint="粘贴你的订阅链接"
             android:inputType="textUri"
             android:padding="16dp"
+            android:background="@drawable/tv_edittext_bg"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#888888"
             android:textSize="18sp" />
 
         <LinearLayout
@@ -62,6 +65,8 @@
                 android:layout_weight="1"
                 android:layout_marginEnd="8dp"
                 android:text="保存并连接"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/tv_button_bg"
                 android:textSize="18sp" />
 
             <Button
@@ -71,6 +76,8 @@
                 android:layout_weight="1"
                 android:layout_marginStart="8dp"
                 android:text="断开代理"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/tv_button_bg"
                 android:textSize="18sp" />
         </LinearLayout>
 
@@ -103,6 +110,8 @@
                 android:id="@+id/btnRefreshNodes"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/tv_button_bg"
                 android:text="刷新节点" />
         </LinearLayout>
 

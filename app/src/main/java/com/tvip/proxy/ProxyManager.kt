@@ -67,25 +67,62 @@ object ProxyManager {
     fun isRunning(): Boolean = httpStarted
 
     /**
-     * 返回第一个可选择的节点组名称，以及该组下的所有节点。
-     * 大多数订阅生成的配置只有一个主选择器分组，够用了；
-     * 如果你的订阅有多层分组嵌套，后续可以在这里扩展成多级列表。
+     * 返回包含最多真实节点的代理组，以及该组下的所有真实节点。
+     * 解决某些订阅里有“自动选择”、“手动切换”等多层嵌套，导致只显示出子组的问题。
      */
     fun listNodes(): Pair<String, List<Proxy>>? {
         val groupNames = Clash.queryGroupNames(true)
-        val groupName = groupNames.firstOrNull() ?: return null
-        val group = Clash.queryGroup(groupName, ProxySort.Default)
-        return groupName to group.proxies
+        var maxNodes = -1
+        var bestGroup: String? = null
+        var bestProxies: List<Proxy>? = null
+
+        for (name in groupNames) {
+            val group = Clash.queryGroup(name, ProxySort.Default)
+            val nodesCount = group.proxies.count { !it.isGroup }
+            if (nodesCount > maxNodes) {
+                maxNodes = nodesCount
+                bestGroup = name
+                bestProxies = group.proxies
+            }
+        }
+
+        if (bestGroup == null || bestProxies == null) return null
+        return bestGroup to bestProxies.filter { !it.isGroup }
     }
 
     fun currentNode(): String? {
         val groupNames = Clash.queryGroupNames(true)
-        val groupName = groupNames.firstOrNull() ?: return null
-        return Clash.queryGroup(groupName, ProxySort.Default).now
+        var maxNodes = -1
+        var bestGroup: String? = null
+
+        for (name in groupNames) {
+            val group = Clash.queryGroup(name, ProxySort.Default)
+            val nodesCount = group.proxies.count { !it.isGroup }
+            if (nodesCount > maxNodes) {
+                maxNodes = nodesCount
+                bestGroup = name
+            }
+        }
+
+        if (bestGroup == null) return null
+        return Clash.queryGroup(bestGroup, ProxySort.Default).now
     }
 
     fun selectNode(groupName: String, nodeName: String): Boolean {
-        return Clash.patchSelector(groupName, nodeName)
+        val success = Clash.patchSelector(groupName, nodeName)
+        if (success) {
+            // 尝试向上级联切换：如果有一个父组（如"节点选择"）包含了当前组（如"手动切换"），
+            // 则同时把父组也切换到当前组，确保流量路由正确。
+            val allGroups = Clash.queryGroupNames(true)
+            for (parentName in allGroups) {
+                if (parentName == groupName) continue
+                val parentGroup = Clash.queryGroup(parentName, ProxySort.Default)
+                if (parentGroup.proxies.any { it.name == groupName }) {
+                    Clash.patchSelector(parentName, groupName)
+                }
+            }
+        }
+        return success
     }
 
     fun setSystemProxy(context: Context, host: String, port: Int) {
@@ -97,10 +134,12 @@ object ProxyManager {
     }
 
     fun clearSystemProxy(context: Context) {
-        Settings.Global.putString(
-            context.contentResolver,
-            Settings.Global.HTTP_PROXY,
-            ":0"
-        )
+        val resolver = context.contentResolver
+        // 某些系统用 ":0" 清除，某些用 "" 清除，这里两者都尝试以确保彻底
+        Settings.Global.putString(resolver, Settings.Global.HTTP_PROXY, ":0")
+        Settings.Global.putString(resolver, Settings.Global.HTTP_PROXY, "")
+        // 同时清除 host 和 port 以防万一
+        Settings.Global.putString(resolver, "global_http_proxy_host", "")
+        Settings.Global.putString(resolver, "global_http_proxy_port", "")
     }
 }

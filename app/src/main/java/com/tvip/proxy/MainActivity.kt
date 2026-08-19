@@ -83,6 +83,16 @@ class MainActivity : AppCompatActivity() {
             val button = Button(this).apply {
                 text = if (node.name == current) "● ${node.name}（当前使用）" else node.name
                 gravity = Gravity.START
+                setTextColor(android.graphics.Color.WHITE)
+                setBackgroundResource(R.drawable.tv_button_bg)
+                val marginParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(0, 8, 0, 8)
+                }
+                layoutParams = marginParams
+                setPadding(32, 24, 32, 24)
                 setOnClickListener {
                     val ok = ProxyManager.selectNode(groupName, node.name)
                     if (ok) {
