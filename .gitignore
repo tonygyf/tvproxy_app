@@ -1,0 +1,130 @@
+# ============================================================
+# Flutter
+# ============================================================
+
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+**/build/
+
+# Flutter generated files
+.flutter_tool/
+.metadata
+
+# Generated plugin registrant
+lib/generated_plugin_registrant.dart
+
+
+# ============================================================
+# Android / Gradle
+# ============================================================
+
+.gradle/
+**/.gradle/
+
+# Android build outputs
+**/build/
+**/outputs/
+**/.cxx/
+
+# Android Studio
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Local Android SDK configuration
+local.properties
+
+# NDK / CMake
+.externalNativeBuild/
+.cxx/
+
+# Signing / keystore files
+*.jks
+*.keystore
+
+
+# ============================================================
+# Kotlin
+# ============================================================
+
+*.class
+.kotlin/
+
+
+# ============================================================
+# Java
+# ============================================================
+
+hs_err_pid*
+replay_pid*
+
+
+# ============================================================
+# Dart
+# ============================================================
+
+*.dart_tool/
+*.packages
+
+
+# ============================================================
+# Go
+# ============================================================
+
+# Go binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go test / coverage
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Go workspace
+go.work.sum
+
+
+# ============================================================
+# VS Code
+# ============================================================
+
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+
+# ============================================================
+# OS
+# ============================================================
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+
+
+# ============================================================
+# Logs / temporary files
+# ============================================================
+
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
