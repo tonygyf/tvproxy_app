@@ -8,6 +8,8 @@ import android.graphics.Color
 import android.os.Bundle
 import android.os.Build
 import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.GridLayout
 import android.widget.ImageView
@@ -15,6 +17,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.lifecycle.lifecycleScope
 import com.github.kr328.clash.common.compat.startForegroundServiceCompat
 import com.tvip.proxy.databinding.ActivityMainBinding
@@ -30,6 +33,7 @@ import java.util.Date
 import java.util.Locale
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlin.math.max
 
 class MainActivity : AppCompatActivity() {
 
@@ -42,6 +46,8 @@ class MainActivity : AppCompatActivity() {
     private var proxyOnIp: String? = null
     private var proxyOffRecoveryIp: String? = null
     private var latestProbeCards: List<ProbeCardItem> = emptyList()
+    private val detailCardViews = mutableListOf<View>()
+    private var hasRetriedInitialDiagnostics = false
 
     // 当前展开详情的是哪张卡片，null 表示二级 banner 隐藏
     private var selectedCard: String? = null
@@ -103,9 +109,19 @@ class MainActivity : AppCompatActivity() {
         binding.cardForeign.setOnClickListener { onCardClicked("foreign") }
         binding.cardCf.setOnClickListener { onCardClicked("cf") }
         binding.cardConn.setOnClickListener { onCardClicked("conn") }
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (selectedCard != null) {
+                    collapseDetailBanner()
+                } else {
+                    finish()
+                }
+            }
+        })
 
         latestProbeCards = buildLoadingProbeCards()
         renderProbeCards(latestProbeCards)
+        updateDetailNavigationState()
         binding.btnConnect.requestFocus()
         testNetwork()
     }
@@ -177,22 +193,43 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onCardClicked(key: String) {
-        selectedCard = if (selectedCard == key) null else key
+        if (selectedCard == key) {
+            collapseDetailBanner(restoreFocus = false)
+            return
+        }
+
+        selectedCard = key
         applySelectedDetail()
         if (selectedCard != null) {
             testNetwork()
         }
     }
 
+    private fun collapseDetailBanner(restoreFocus: Boolean = true) {
+        val bannerView = resolveSelectedBannerView()
+        selectedCard = null
+        applySelectedDetail()
+        if (restoreFocus) {
+            bannerView?.requestFocus()
+        }
+    }
+
     private fun applySelectedDetail() {
         val visible = selectedCard != null
         binding.detailBanner.visibility =
-            if (visible) android.view.View.VISIBLE else android.view.View.GONE
+            if (visible) View.VISIBLE else View.GONE
+        lockMainContentFocus(visible)
         if (visible) {
             binding.tvDetailBannerTitle.text = "网站连接详情"
             binding.tvDetailBannerHint.text = "共 ${latestProbeCards.size} 个站点，含国内/国外"
             renderProbeCards(latestProbeCards)
+            binding.detailBannerScroll.post {
+                binding.detailBannerScroll.smoothScrollTo(0, 0)
+            }
+        } else {
+            binding.detailBannerScroll.scrollTo(0, 0)
         }
+        updateDetailNavigationState()
     }
 
     private fun scheduleRetest(delayMs: Long = 1200L) {
@@ -258,8 +295,27 @@ class MainActivity : AppCompatActivity() {
                 latestProbeCards = buildProbeCards(domesticResults, foreignResults)
                 renderProbeCards(latestProbeCards)
                 applySelectedDetail()
+                maybeRetryInitialDiagnostics(cfTrace, geoInfo, domesticResults, foreignResults)
             }
         }
+    }
+
+    private fun maybeRetryInitialDiagnostics(
+        cfTrace: NetworkDiagnostics.CloudflareTrace?,
+        geoInfo: NetworkDiagnostics.GeoInfo?,
+        domesticResults: List<NetworkDiagnostics.ProbeResult>,
+        foreignResults: List<NetworkDiagnostics.ProbeResult>
+    ) {
+        if (hasRetriedInitialDiagnostics) return
+        val successCount = (domesticResults + foreignResults).count {
+            it.status == NetworkDiagnostics.ProbeStatus.SUCCESS
+        }
+        val missingExitIp = cfTrace?.ip.isNullOrBlank() && geoInfo?.ip.isNullOrBlank()
+        if (successCount > 0 && !missingExitIp) return
+
+        hasRetriedInitialDiagnostics = true
+        binding.tvConnDetail.text = "首次检测结果不稳定，正在自动重试..."
+        scheduleRetest(1500L)
     }
 
     private fun recordProxyHistory(proxyEnabled: Boolean, exitIp: String?) {
@@ -488,16 +544,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderProbeCards(cards: List<ProbeCardItem>) {
+        val focusedDetailIndex = detailCardViews.indexOfFirst { it.isFocused }
         binding.detailBannerGrid.removeAllViews()
+        detailCardViews.clear()
         cards.forEachIndexed { index, item ->
-            binding.detailBannerGrid.addView(createProbeCardView(item, index))
+            val cardView = createProbeCardView(item, index)
+            detailCardViews += cardView
+            binding.detailBannerGrid.addView(cardView)
+        }
+        updateDetailNavigationState()
+        if (selectedCard != null && focusedDetailIndex in detailCardViews.indices) {
+            detailCardViews[focusedDetailIndex].requestFocus()
         }
     }
 
     private fun createProbeCardView(item: ProbeCardItem, index: Int): LinearLayout {
         val card = LinearLayout(this).apply {
+            id = View.generateViewId()
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            isFocusable = true
+            isFocusableInTouchMode = true
+            isClickable = true
             setBackgroundResource(R.drawable.tv_detail_item_bg)
             setPadding(dp(12), dp(12), dp(12), dp(12))
             layoutParams = GridLayout.LayoutParams().apply {
@@ -510,6 +578,11 @@ class MainActivity : AppCompatActivity() {
                     if (index % 2 == 0) dp(6) else 0,
                     dp(10)
                 )
+            }
+            setOnFocusChangeListener { view, hasFocus ->
+                if (hasFocus) {
+                    ensureDetailCardVisible(view)
+                }
             }
         }
 
@@ -558,6 +631,89 @@ class MainActivity : AppCompatActivity() {
         card.addView(textColumn)
         card.addView(latencyView)
         return card
+    }
+
+    private fun updateDetailNavigationState() {
+        val firstTargetId = if (selectedCard != null && detailCardViews.isNotEmpty()) {
+            detailCardViews.first().id
+        } else {
+            binding.btnImport.id
+        }
+        listOf(
+            binding.cardDomestic,
+            binding.cardForeign,
+            binding.cardCf,
+            binding.cardConn
+        ).forEach { card ->
+            card.nextFocusDownId = firstTargetId
+        }
+
+        if (detailCardViews.isEmpty()) {
+            return
+        }
+
+        val selectedBannerId = resolveSelectedBannerView()?.id ?: binding.cardDomestic.id
+        val columnCount = 2
+        detailCardViews.forEachIndexed { index, view ->
+            val upIndex = index - columnCount
+            val downIndex = index + columnCount
+            val isLeftColumn = index % columnCount == 0
+            val rightIndex = if (isLeftColumn && index + 1 < detailCardViews.size) index + 1 else index
+            val leftIndex = if (isLeftColumn) index else index - 1
+
+            view.nextFocusUpId = if (upIndex >= 0) detailCardViews[upIndex].id else selectedBannerId
+            view.nextFocusDownId =
+                if (downIndex < detailCardViews.size) detailCardViews[downIndex].id else view.id
+            view.nextFocusLeftId = detailCardViews[leftIndex].id
+            view.nextFocusRightId = detailCardViews[rightIndex].id
+        }
+    }
+
+    private fun ensureDetailCardVisible(view: View) {
+        binding.detailBannerScroll.post {
+            val extraPadding = dp(8)
+            val targetTop = max(0, view.top - extraPadding)
+            val targetBottom = view.bottom + extraPadding
+            val currentTop = binding.detailBannerScroll.scrollY
+            val currentBottom = currentTop + binding.detailBannerScroll.height
+
+            when {
+                targetTop < currentTop -> binding.detailBannerScroll.smoothScrollTo(0, targetTop)
+                targetBottom > currentBottom ->
+                    binding.detailBannerScroll.smoothScrollTo(
+                        0,
+                        max(0, targetBottom - binding.detailBannerScroll.height)
+                    )
+            }
+        }
+    }
+
+    private fun lockMainContentFocus(lock: Boolean) {
+        binding.mainContentContainer.descendantFocusability =
+            if (lock) ViewGroup.FOCUS_BLOCK_DESCENDANTS else ViewGroup.FOCUS_AFTER_DESCENDANTS
+
+        if (lock && isDescendantOf(binding.mainContentContainer, currentFocus)) {
+            resolveSelectedBannerView()?.requestFocus()
+        }
+    }
+
+    private fun resolveSelectedBannerView(): View? {
+        return when (selectedCard) {
+            "domestic" -> binding.cardDomestic
+            "foreign" -> binding.cardForeign
+            "cf" -> binding.cardCf
+            "conn" -> binding.cardConn
+            else -> null
+        }
+    }
+
+    private fun isDescendantOf(parent: View, child: View?): Boolean {
+        var current = child
+        while (current != null) {
+            if (current === parent) return true
+            current = (current.parent as? View)
+        }
+        return false
     }
 
     private fun iconUrlForSite(name: String): String? {

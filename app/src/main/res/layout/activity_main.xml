@@ -184,6 +184,7 @@
             android:layout_width="match_parent"
             android:layout_height="260dp"
             android:layout_marginTop="12dp"
+            android:descendantFocusability="afterDescendants"
             android:fadeScrollbars="false"
             android:fillViewport="true"
             android:overScrollMode="never"
@@ -194,6 +195,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:columnCount="2"
+                android:descendantFocusability="afterDescendants"
                 android:orientation="horizontal"
                 android:useDefaultMargins="false" />
         </ScrollView>
@@ -204,12 +206,14 @@
         android:id="@+id/mainScrollView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:descendantFocusability="afterDescendants"
         android:layout_weight="1">
 
         <LinearLayout
             android:id="@+id/mainContentContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:descendantFocusability="afterDescendants"
             android:orientation="vertical">
 
             <TextView
