@@ -18,19 +18,30 @@ object ProxyManager {
         context.filesDir.resolve("profile.yaml")
 
     /**
-     * 拉取订阅 -> 加载配置 -> 启动本地HTTP代理 -> 写入系统全局代理
+     * 拉取订阅并保存为配置
+     */
+    suspend fun importConfig(context: Context, subscriptionUrl: String, onStatus: (String) -> Unit) {
+        onStatus("正在拉取订阅...")
+        Clash.fetchAndValid(configFile(context), subscriptionUrl, true) { status ->
+            onStatus("拉取中: ${status.action}")
+        }.await()
+        onStatus("拉取成功，节点已更新")
+    }
+
+    /**
+     * 加载配置 -> 启动本地HTTP代理 -> 写入系统全局代理
      * 任何一步失败，都会自动清空系统代理设置（安全网），不让电视被卡死在无效代理上。
      * 这是个挂起函数，请在协程里调用（比如 ProxyService 里的 CoroutineScope）。
      */
-    suspend fun start(context: Context, subscriptionUrl: String, onStatus: (String) -> Unit) {
+    suspend fun start(context: Context, onStatus: (String) -> Unit) {
         try {
-            onStatus("正在拉取订阅...")
-            Clash.fetchAndValid(configFile(context), subscriptionUrl, true) { status ->
-                onStatus("拉取中: ${status.action}")
-            }.await()
+            val file = configFile(context)
+            if (!file.exists()) {
+                throw IllegalStateException("未找到配置，请先导入节点信息")
+            }
 
             onStatus("正在加载配置...")
-            Clash.load(configFile(context)).await()
+            Clash.load(file).await()
 
             onStatus("正在启动本地代理...")
             val error = Clash.startHttp("127.0.0.1:$LOCAL_PORT")
@@ -126,20 +137,24 @@ object ProxyManager {
     }
 
     fun setSystemProxy(context: Context, host: String, port: Int) {
-        Settings.Global.putString(
-            context.contentResolver,
-            Settings.Global.HTTP_PROXY,
-            "$host:$port"
-        )
+        val resolver = context.contentResolver
+        Settings.Global.putString(resolver, Settings.Global.HTTP_PROXY, "$host:$port")
+        Settings.Global.putString(resolver, "global_http_proxy_host", host)
+        Settings.Global.putString(resolver, "global_http_proxy_port", port.toString())
+        Settings.Global.putString(resolver, "global_http_proxy_exclusion_list", "")
+        Settings.Global.putString(resolver, "global_proxy_pac_url", "")
     }
 
     fun clearSystemProxy(context: Context) {
         val resolver = context.contentResolver
-        // 某些系统用 ":0" 清除，某些用 "" 清除，这里两者都尝试以确保彻底
-        Settings.Global.putString(resolver, Settings.Global.HTTP_PROXY, ":0")
-        Settings.Global.putString(resolver, Settings.Global.HTTP_PROXY, "")
-        // 同时清除 host 和 port 以防万一
-        Settings.Global.putString(resolver, "global_http_proxy_host", "")
-        Settings.Global.putString(resolver, "global_http_proxy_port", "")
+        try {
+            Settings.Global.putString(resolver, Settings.Global.HTTP_PROXY, null)
+            Settings.Global.putString(resolver, "global_http_proxy_host", null)
+            Settings.Global.putString(resolver, "global_http_proxy_port", null)
+            Settings.Global.putString(resolver, "global_http_proxy_exclusion_list", null)
+            Settings.Global.putString(resolver, "global_proxy_pac_url", null)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }

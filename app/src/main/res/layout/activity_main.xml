@@ -1,22 +1,158 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     android:background="#101010"
     android:padding="32dp">
 
+    <!-- Fixed Network Status Banner at the top -->
     <LinearLayout
+        android:id="@+id/networkBanner"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="horizontal"
+        android:paddingBottom="16dp"
+        android:weightSum="4">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <!-- Domestic -->
+        <FrameLayout
+            android:id="@+id/cardDomestic"
+            android:layout_width="0dp"
+            android:layout_height="120dp"
+            android:layout_weight="1"
+            android:focusable="true"
+            android:clickable="true"
+            android:background="#222222"
+            android:foreground="@drawable/tv_card_fg"
+            android:layout_marginEnd="8dp">
+            
+            <ImageView
+                android:id="@+id/ivDomesticFlag"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:alpha="0.3"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="国内测试" android:textColor="#FFFFFF" android:textStyle="bold"/>
+                <TextView android:id="@+id/tvDomesticIp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textColor="#4285F4" android:textSize="16sp" android:layout_marginTop="8dp"/>
+                <TextView android:id="@+id/tvDomesticLoc" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textColor="#AAAAAA" android:textSize="12sp" android:layout_marginTop="4dp"/>
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- Foreign -->
+        <FrameLayout
+            android:id="@+id/cardForeign"
+            android:layout_width="0dp"
+            android:layout_height="120dp"
+            android:layout_weight="1"
+            android:focusable="true"
+            android:clickable="true"
+            android:background="#222222"
+            android:foreground="@drawable/tv_card_fg"
+            android:layout_marginEnd="8dp">
+
+            <ImageView
+                android:id="@+id/ivForeignFlag"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:alpha="0.3"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="国外测试" android:textColor="#FFFFFF" android:textStyle="bold"/>
+                <TextView android:id="@+id/tvForeignIp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textColor="#4285F4" android:textSize="16sp" android:layout_marginTop="8dp"/>
+                <TextView android:id="@+id/tvForeignLoc" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textColor="#AAAAAA" android:textSize="12sp" android:layout_marginTop="4dp"/>
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- CF -->
+        <FrameLayout
+            android:id="@+id/cardCf"
+            android:layout_width="0dp"
+            android:layout_height="120dp"
+            android:layout_weight="1"
+            android:focusable="true"
+            android:clickable="true"
+            android:background="#222222"
+            android:foreground="@drawable/tv_card_fg"
+            android:layout_marginEnd="8dp">
+
+            <ImageView
+                android:id="@+id/ivCfFlag"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:alpha="0.3"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="CloudFlare" android:textColor="#FFFFFF" android:textStyle="bold"/>
+                <TextView android:id="@+id/tvCfIp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textColor="#4285F4" android:textSize="16sp" android:layout_marginTop="8dp"/>
+                <TextView android:id="@+id/tvCfLoc" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textColor="#AAAAAA" android:textSize="12sp" android:layout_marginTop="4dp"/>
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- Connectivity -->
+        <FrameLayout
+            android:id="@+id/cardConn"
+            android:layout_width="0dp"
+            android:layout_height="120dp"
+            android:layout_weight="1"
+            android:focusable="true"
+            android:clickable="true"
+            android:background="#222222"
+            android:foreground="@drawable/tv_card_fg">
+
+            <ImageView
+                android:id="@+id/ivConnFlag"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:alpha="0.3"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="16dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="墙外测试" android:textColor="#FFFFFF" android:textStyle="bold"/>
+                <TextView android:id="@+id/tvConnStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textColor="#4285F4" android:textSize="14sp" android:layout_marginTop="8dp"/>
+                <TextView android:id="@+id/tvConnDetail" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="-" android:textColor="#AAAAAA" android:textSize="12sp" android:layout_marginTop="4dp"/>
+            </LinearLayout>
+        </FrameLayout>
+    </LinearLayout>
+
+    <!-- Scrollable Content -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="第一次使用：先在电脑上执行这条命令完成一次性授权"
-            android:textColor="#AAAAAA"
-            android:textSize="16sp" />
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="第一次使用：先在电脑上执行这条命令完成一次性授权"
+                android:textColor="#AAAAAA"
+                android:textSize="16sp" />
 
         <TextView
             android:id="@+id/textGrantCommand"
@@ -59,12 +195,23 @@
             android:orientation="horizontal">
 
             <Button
+                android:id="@+id/btnImport"
+                android:layout_width="0dp"
+                android:layout_height="72dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="导入更新节点"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/tv_button_bg"
+                android:textSize="18sp" />
+
+            <Button
                 android:id="@+id/btnConnect"
                 android:layout_width="0dp"
                 android:layout_height="72dp"
                 android:layout_weight="1"
                 android:layout_marginEnd="8dp"
-                android:text="保存并连接"
+                android:text="连接"
                 android:textColor="#FFFFFF"
                 android:background="@drawable/tv_button_bg"
                 android:textSize="18sp" />
@@ -74,8 +221,7 @@
                 android:layout_width="0dp"
                 android:layout_height="72dp"
                 android:layout_weight="1"
-                android:layout_marginStart="8dp"
-                android:text="断开代理"
+                android:text="断开"
                 android:textColor="#FFFFFF"
                 android:background="@drawable/tv_button_bg"
                 android:textSize="18sp" />
@@ -92,6 +238,50 @@
             android:text="状态：未启动"
             android:textColor="#FFFFFF"
             android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/tvProxySummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:background="#151515"
+            android:padding="16dp"
+            android:text="Proxy 状态：未测试"
+            android:textColor="#D0D0D0"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/tvDomesticTests"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:background="#151515"
+            android:padding="16dp"
+            android:text="国内测试：未测试"
+            android:textColor="#D0D0D0"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/tvForeignTests"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:background="#151515"
+            android:padding="16dp"
+            android:text="国外测试：未测试"
+            android:textColor="#D0D0D0"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/tvProxyDiagnosis"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:background="#151515"
+            android:padding="16dp"
+            android:text="Proxy 诊断：未测试"
+            android:textColor="#D0D0D0"
+            android:textSize="15sp" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -123,4 +313,5 @@
             android:orientation="vertical" />
 
     </LinearLayout>
-</ScrollView>
+    </ScrollView>
+</LinearLayout>

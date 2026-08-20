@@ -17,6 +17,7 @@ class ProxyService : Service() {
     companion object {
         const val ACTION_START = "com.tvip.proxy.action.START"
         const val ACTION_STOP = "com.tvip.proxy.action.STOP"
+        const val ACTION_IMPORT = "com.tvip.proxy.action.IMPORT"
         const val CHANNEL_ID = "tvproxy_channel"
         const val NOTIFICATION_ID = 1
 
@@ -53,32 +54,56 @@ class ProxyService : Service() {
                     stopSelf()
                 }
             }
-            else -> {
+            ACTION_IMPORT -> {
                 val url = SettingsStore.getSubscriptionUrl(applicationContext)
                 if (url.isNullOrBlank()) {
                     updateStatus("尚未设置订阅地址")
-                    @Suppress("DEPRECATION")
-                    stopForeground(true)
-                    stopSelf()
+                    if (!ProxyManager.isRunning()) {
+                        @Suppress("DEPRECATION")
+                        stopForeground(true)
+                        stopSelf()
+                    }
                 } else {
                     scope.launch {
                         try {
-                            ProxyManager.start(applicationContext, url) { status ->
+                            ProxyManager.importConfig(applicationContext, url) { status ->
                                 updateStatus(status)
                                 updateNotification(status)
                             }
-                            // 恢复上次选择的节点（如果之前选过）
-                            SettingsStore.getSelectedNode(applicationContext)?.let { node ->
-                                ProxyManager.listNodes()?.let { (group, _) ->
-                                    ProxyManager.selectNode(group, node)
-                                }
+                            if (!ProxyManager.isRunning()) {
+                                @Suppress("DEPRECATION")
+                                stopForeground(true)
+                                stopSelf()
                             }
                         } catch (e: Exception) {
-                            updateStatus("启动失败: ${e.message}")
-                            @Suppress("DEPRECATION")
-                            stopForeground(true)
-                            stopSelf()
+                            updateStatus("导入失败: ${e.message}")
+                            if (!ProxyManager.isRunning()) {
+                                @Suppress("DEPRECATION")
+                                stopForeground(true)
+                                stopSelf()
+                            }
                         }
+                    }
+                }
+            }
+            else -> {
+                scope.launch {
+                    try {
+                        ProxyManager.start(applicationContext) { status ->
+                            updateStatus(status)
+                            updateNotification(status)
+                        }
+                        // 恢复上次选择的节点（如果之前选过）
+                        SettingsStore.getSelectedNode(applicationContext)?.let { node ->
+                            ProxyManager.listNodes()?.let { (group, _) ->
+                                ProxyManager.selectNode(group, node)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        updateStatus("启动失败: ${e.message}")
+                        @Suppress("DEPRECATION")
+                        stopForeground(true)
+                        stopSelf()
                     }
                 }
             }
