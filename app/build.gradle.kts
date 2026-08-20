@@ -16,6 +16,15 @@ android {
 
     compileSdk = 34
 
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            isUniversalApk = false // 设置为 false，只生成分架构的包，从而最大程度减小体积
+        }
+    }
+
     // :core 模块内部用 alpha/meta 两个变体来对应golang插件的两套源码集，
     // 这里只是为了让依赖解析不产生歧义，我们只用 alpha 这一个变体，忽略 meta。
     flavorDimensions += "feature"
