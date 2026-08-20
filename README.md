@@ -1,3 +1,11 @@
+<p align="center">
+  <img
+    src="https://raw.githubusercontent.com/tonygyf/tvproxy_app/main/app/src/main/ic_launcher-playstore.png"
+    alt="TV Proxy"
+    width="160"
+  />
+</p>
+
 <h1 align="center">TV Proxy</h1>
 
 <p align="center">一个面向 Android TV 的全局代理控制工具，支持订阅导入、节点切换、开机恢复，以及可直接在电视端查看的网络状态与站点连通性诊断。</p>
@@ -16,7 +24,10 @@
   <a href="https://github.com/tonygyf/tvproxy_app/releases"><img src="https://img.shields.io/github/downloads/tonygyf/tvproxy_app/total" alt="Downloads"></a>
   <a href="https://github.com/tonygyf/tvproxy_app/stargazers"><img src="https://img.shields.io/github/stars/tonygyf/tvproxy_app" alt="Stars"></a>
 </p>
-
+<p align="center">
+  订阅导入 · 节点切换 · Global Proxy · 网络诊断
+</p>
+<hr>
 ## 项目简介
 
 TV Proxy 运行在 Android TV / 电视盒子上，核心目标是把电视端代理操作做得更直接：
