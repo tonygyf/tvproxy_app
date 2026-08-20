@@ -3,6 +3,7 @@ package com.tvip.proxy
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.github.kr328.clash.common.compat.startForegroundServiceCompat
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -12,6 +13,6 @@ class BootReceiver : BroadcastReceiver() {
         val serviceIntent = Intent(context, ProxyService::class.java).apply {
             action = ProxyService.ACTION_START
         }
-        context.startForegroundService(serviceIntent)
+        context.startForegroundServiceCompat(serviceIntent)
     }
 }

@@ -1,15 +1,22 @@
 package com.tvip.proxy
 
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.os.Bundle
+import android.os.Build
 import android.view.Gravity
 import android.widget.Button
+import android.widget.GridLayout
 import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.bumptech.glide.Glide
-import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
+import com.github.kr328.clash.common.compat.startForegroundServiceCompat
 import com.tvip.proxy.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -21,16 +28,33 @@ import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private var autoRetestJob: Job? = null
     private var activeTestJob: Job? = null
+    private val imageLoadJobs = mutableMapOf<ImageView, Job>()
 
     private var baselineOffIp: String? = null
     private var proxyOnIp: String? = null
     private var proxyOffRecoveryIp: String? = null
+    private var latestProbeCards: List<ProbeCardItem> = emptyList()
+
+    // 当前展开详情的是哪张卡片，null 表示二级 banner 隐藏
+    private var selectedCard: String? = null
+
+    private data class ProbeCardItem(
+        val name: String,
+        val regionLabel: String,
+        val iconUrl: String?,
+        val statusText: String,
+        val detailText: String,
+        val latencyText: String,
+        val success: Boolean
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,6 +63,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.textGrantCommand.text =
             "adb shell pm grant $packageName android.permission.WRITE_SECURE_SETTINGS"
+        binding.textVersion.text = "版本 ${resolveVersionName()}"
 
         binding.editSubUrl.setText(SettingsStore.getSubscriptionUrl(this) ?: "")
 
@@ -53,32 +78,34 @@ class MainActivity : AppCompatActivity() {
             val intent = Intent(this, ProxyService::class.java).apply {
                 action = ProxyService.ACTION_IMPORT
             }
-            startForegroundService(intent)
+            startForegroundServiceCompat(intent)
         }
 
         binding.btnConnect.setOnClickListener {
             val intent = Intent(this, ProxyService::class.java).apply {
                 action = ProxyService.ACTION_START
             }
-            startForegroundService(intent)
+            startForegroundServiceCompat(intent)
         }
 
         binding.btnDisconnect.setOnClickListener {
             val intent = Intent(this, ProxyService::class.java).apply {
                 action = ProxyService.ACTION_STOP
             }
-            startForegroundService(intent)
+            startForegroundServiceCompat(intent)
         }
 
         binding.btnRefreshNodes.setOnClickListener {
             refreshNodeList()
         }
 
-        binding.cardDomestic.setOnClickListener { testNetwork() }
-        binding.cardForeign.setOnClickListener { testNetwork() }
-        binding.cardCf.setOnClickListener { testNetwork() }
-        binding.cardConn.setOnClickListener { testNetwork() }
+        binding.cardDomestic.setOnClickListener { onCardClicked("domestic") }
+        binding.cardForeign.setOnClickListener { onCardClicked("foreign") }
+        binding.cardCf.setOnClickListener { onCardClicked("cf") }
+        binding.cardConn.setOnClickListener { onCardClicked("conn") }
 
+        latestProbeCards = buildLoadingProbeCards()
+        renderProbeCards(latestProbeCards)
         binding.btnConnect.requestFocus()
         testNetwork()
     }
@@ -149,6 +176,25 @@ class MainActivity : AppCompatActivity() {
         binding.textStatus.text = "状态：$status"
     }
 
+    private fun onCardClicked(key: String) {
+        selectedCard = if (selectedCard == key) null else key
+        applySelectedDetail()
+        if (selectedCard != null) {
+            testNetwork()
+        }
+    }
+
+    private fun applySelectedDetail() {
+        val visible = selectedCard != null
+        binding.detailBanner.visibility =
+            if (visible) android.view.View.VISIBLE else android.view.View.GONE
+        if (visible) {
+            binding.tvDetailBannerTitle.text = "网站连接详情"
+            binding.tvDetailBannerHint.text = "共 ${latestProbeCards.size} 个站点，含国内/国外"
+            renderProbeCards(latestProbeCards)
+        }
+    }
+
     private fun scheduleRetest(delayMs: Long = 1200L) {
         autoRetestJob?.cancel()
         autoRetestJob = lifecycleScope.launch {
@@ -168,10 +214,9 @@ class MainActivity : AppCompatActivity() {
         binding.tvCfLoc.text = "-"
         binding.tvConnStatus.text = "测试中"
         binding.tvConnDetail.text = "-"
-        binding.tvProxySummary.text = "Proxy 状态：测试中..."
-        binding.tvDomesticTests.text = "国内测试：测试中..."
-        binding.tvForeignTests.text = "国外测试：测试中..."
-        binding.tvProxyDiagnosis.text = "Proxy 诊断：测试中..."
+        latestProbeCards = buildLoadingProbeCards()
+        renderProbeCards(latestProbeCards)
+        applySelectedDetail()
 
         activeTestJob = lifecycleScope.launch(Dispatchers.IO) {
             val proxySnapshot = NetworkDiagnostics.readProxySnapshot(this@MainActivity)
@@ -210,10 +255,9 @@ class MainActivity : AppCompatActivity() {
                 binding.tvConnDetail.text = "更新于 ${formatTimestamp(System.currentTimeMillis())}"
                 binding.ivConnFlag.setImageDrawable(null)
 
-                binding.tvProxySummary.text = buildProxySummary(proxySnapshot, cfTrace, geoInfo, exitIp)
-                binding.tvDomesticTests.text = buildProbeBlock("国内测试", domesticResults)
-                binding.tvForeignTests.text = buildProbeBlock("国外测试", foreignResults)
-                binding.tvProxyDiagnosis.text = buildProxyDiagnosis(proxySnapshot.enabled, exitIp)
+                latestProbeCards = buildProbeCards(domesticResults, foreignResults)
+                renderProbeCards(latestProbeCards)
+                applySelectedDetail()
             }
         }
     }
@@ -284,25 +328,25 @@ class MainActivity : AppCompatActivity() {
     private fun buildProxyDiagnosis(proxyEnabled: Boolean, exitIp: String?): String {
         val conclusion = when {
             baselineOffIp != null &&
-                proxyOnIp != null &&
-                proxyOffRecoveryIp != null &&
-                baselineOffIp != proxyOnIp &&
-                proxyOffRecoveryIp == baselineOffIp -> "Proxy 工作正常"
+                    proxyOnIp != null &&
+                    proxyOffRecoveryIp != null &&
+                    baselineOffIp != proxyOnIp &&
+                    proxyOffRecoveryIp == baselineOffIp -> "Proxy 工作正常"
 
             baselineOffIp != null &&
-                proxyOnIp != null &&
-                proxyOffRecoveryIp != null &&
-                baselineOffIp != proxyOnIp &&
-                proxyOffRecoveryIp == proxyOnIp -> "代理已关闭，但测试请求仍命中旧连接或旧缓存"
+                    proxyOnIp != null &&
+                    proxyOffRecoveryIp != null &&
+                    baselineOffIp != proxyOnIp &&
+                    proxyOffRecoveryIp == proxyOnIp -> "代理已关闭，但测试请求仍命中旧连接或旧缓存"
 
             baselineOffIp != null &&
-                proxyOnIp != null &&
-                baselineOffIp == proxyOnIp -> "当前测试请求没有检测到出口变化"
+                    proxyOnIp != null &&
+                    baselineOffIp == proxyOnIp -> "当前测试请求没有检测到出口变化"
 
             baselineOffIp != null &&
-                proxyOnIp != null &&
-                proxyOffRecoveryIp != null &&
-                proxyOffRecoveryIp != baselineOffIp -> "关闭代理后出口没有回到基线，可能存在 DNS 缓存、系统代理残留或外部网络变化"
+                    proxyOnIp != null &&
+                    proxyOffRecoveryIp != null &&
+                    proxyOffRecoveryIp != baselineOffIp -> "关闭代理后出口没有回到基线，可能存在 DNS 缓存、系统代理残留或外部网络变化"
 
             exitIp.isNullOrBlank() -> "当前出口 IP 获取失败，暂时无法下结论"
             else -> "已记录当前阶段，继续执行 OFF -> ON -> OFF 可得到完整结论"
@@ -382,19 +426,222 @@ class MainActivity : AppCompatActivity() {
         }.joinToString(" · ").ifBlank { "-" }
     }
 
-    private fun updateFlag(imageView: ImageView, countryCode: String?) {
-        if (countryCode.isNullOrBlank()) {
-            imageView.setImageDrawable(null)
-            return
+    private fun buildLoadingProbeCards(): List<ProbeCardItem> {
+        val domesticCards = NetworkDiagnostics.domesticEndpoints.map { endpoint ->
+            ProbeCardItem(
+                name = endpoint.name,
+                regionLabel = "国内",
+                iconUrl = iconUrlForSite(endpoint.name),
+                statusText = "测试中",
+                detailText = "等待网络请求",
+                latencyText = "...",
+                success = false
+            )
+        }
+        val foreignCards = NetworkDiagnostics.foreignEndpoints.map { endpoint ->
+            ProbeCardItem(
+                name = endpoint.name,
+                regionLabel = "国外",
+                iconUrl = iconUrlForSite(endpoint.name),
+                statusText = "测试中",
+                detailText = "等待网络请求",
+                latencyText = "...",
+                success = false
+            )
+        }
+        return domesticCards + foreignCards
+    }
+
+    private fun buildProbeCards(
+        domesticResults: List<NetworkDiagnostics.ProbeResult>,
+        foreignResults: List<NetworkDiagnostics.ProbeResult>
+    ): List<ProbeCardItem> {
+        return domesticResults.map { result ->
+            result.toProbeCardItem("国内")
+        } + foreignResults.map { result ->
+            result.toProbeCardItem("国外")
+        }
+    }
+
+    private fun NetworkDiagnostics.ProbeResult.toProbeCardItem(regionLabel: String): ProbeCardItem {
+        val success = status == NetworkDiagnostics.ProbeStatus.SUCCESS
+        val latencyText = when (status) {
+            NetworkDiagnostics.ProbeStatus.SUCCESS -> "${latencyMs ?: "-"} ms"
+            NetworkDiagnostics.ProbeStatus.TIMEOUT -> "超时"
+            else -> status.label
+        }
+        val detailText = when (status) {
+            NetworkDiagnostics.ProbeStatus.SUCCESS -> detail
+            NetworkDiagnostics.ProbeStatus.TIMEOUT -> "请求超时"
+            else -> detail.ifBlank { status.label }
         }
 
-        Glide.with(this)
-            .load("https://flagcdn.com/w320/${countryCode.lowercase(Locale.ROOT)}.png")
-            .transition(DrawableTransitionOptions.withCrossFade())
-            .into(imageView)
+        return ProbeCardItem(
+            name = name,
+            regionLabel = regionLabel,
+            iconUrl = iconUrlForSite(name),
+            statusText = status.label,
+            detailText = detailText,
+            latencyText = latencyText,
+            success = success
+        )
+    }
+
+    private fun renderProbeCards(cards: List<ProbeCardItem>) {
+        binding.detailBannerGrid.removeAllViews()
+        cards.forEachIndexed { index, item ->
+            binding.detailBannerGrid.addView(createProbeCardView(item, index))
+        }
+    }
+
+    private fun createProbeCardView(item: ProbeCardItem, index: Int): LinearLayout {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundResource(R.drawable.tv_detail_item_bg)
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            layoutParams = GridLayout.LayoutParams().apply {
+                width = 0
+                height = GridLayout.LayoutParams.WRAP_CONTENT
+                columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+                setMargins(
+                    if (index % 2 == 0) 0 else dp(6),
+                    0,
+                    if (index % 2 == 0) dp(6) else 0,
+                    dp(10)
+                )
+            }
+        }
+
+        val iconView = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
+            setImageResource(android.R.drawable.ic_menu_compass)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            background = getDrawable(R.drawable.tv_edittext_bg)
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+        }
+        updateRemoteImage(iconView, item.iconUrl, android.R.drawable.ic_menu_compass)
+
+        val textColumn = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(10)
+                marginEnd = dp(10)
+            }
+        }
+
+        val titleView = TextView(this).apply {
+            text = "${item.name} ${item.regionLabel}"
+            setTextColor(Color.WHITE)
+            textSize = 14f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        }
+
+        val subtitleView = TextView(this).apply {
+            text = item.detailText
+            setTextColor(Color.parseColor("#9E9E9E"))
+            textSize = 11f
+            maxLines = 1
+        }
+
+        val latencyView = TextView(this).apply {
+            text = item.latencyText
+            setTextColor(if (item.success) Color.parseColor("#FF9800") else Color.parseColor("#B0BEC5"))
+            textSize = 15f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            gravity = Gravity.END
+        }
+
+        textColumn.addView(titleView)
+        textColumn.addView(subtitleView)
+        card.addView(iconView)
+        card.addView(textColumn)
+        card.addView(latencyView)
+        return card
+    }
+
+    private fun iconUrlForSite(name: String): String? {
+        return when (name) {
+            "抖音" -> "https://www.douyin.com/favicon.ico"
+            "Bilibili" -> "https://www.bilibili.com/favicon.ico"
+            "微信" -> "https://res.wx.qq.com/a/wx_fed/assets/res/NTI4MWU5.ico"
+            "淘宝" -> "https://www.taobao.com/favicon.ico"
+            "GitHub" -> "https://github.com/favicon.ico"
+            "Telegram" -> "https://telegram.org/favicon.ico"
+            "X.com" -> "https://abs.twimg.com/favicons/twitter.3.ico"
+            "YouTube" -> "https://www.youtube.com/favicon.ico"
+            "Google" -> "https://www.google.com/favicon.ico"
+            else -> null
+        }
+    }
+
+    private fun updateFlag(imageView: ImageView, countryCode: String?) {
+        val url = countryCode?.takeIf { it.isNotBlank() }
+            ?.let { "https://flagcdn.com/w320/${it.lowercase(Locale.ROOT)}.png" }
+        updateRemoteImage(imageView, url)
     }
 
     private fun formatTimestamp(timestamp: Long): String {
         return SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(timestamp))
+    }
+
+    private fun resolveVersionName(): String {
+        return try {
+            val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageInfo(packageName, 0)
+            }
+            info.versionName ?: "-"
+        } catch (_: Exception) {
+            "-"
+        }
+    }
+
+    private fun updateRemoteImage(
+        imageView: ImageView,
+        imageUrl: String?,
+        placeholderResId: Int? = null
+    ) {
+        imageLoadJobs.remove(imageView)?.cancel()
+        imageView.tag = imageUrl
+
+        when {
+            placeholderResId != null -> imageView.setImageResource(placeholderResId)
+            else -> imageView.setImageDrawable(null)
+        }
+
+        if (imageUrl.isNullOrBlank()) {
+            return
+        }
+
+        imageLoadJobs[imageView] = lifecycleScope.launch {
+            val bitmap = withContext(Dispatchers.IO) {
+                fetchBitmap(imageUrl)
+            }
+            if (imageView.tag == imageUrl && bitmap != null) {
+                imageView.setImageBitmap(bitmap)
+            }
+        }
+    }
+
+    private fun fetchBitmap(imageUrl: String): Bitmap? {
+        val connection = (URL(imageUrl).openConnection() as? HttpURLConnection)
+            ?: return null
+        return try {
+            connection.connectTimeout = 4000
+            connection.readTimeout = 4000
+            connection.instanceFollowRedirects = true
+            connection.inputStream.use(BitmapFactory::decodeStream)
+        } catch (_: Exception) {
+            null
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun dp(value: Int): Int {
+        return (value * resources.displayMetrics.density).toInt()
     }
 }

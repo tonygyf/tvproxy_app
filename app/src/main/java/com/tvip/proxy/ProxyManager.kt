@@ -1,6 +1,8 @@
 package com.tvip.proxy
 
+import android.app.ActivityManager
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.provider.Settings
 import com.github.kr328.clash.core.Clash
 import com.github.kr328.clash.core.model.Proxy
@@ -64,6 +66,10 @@ object ProxyManager {
     }
 
     fun stop(context: Context) {
+        // 最优先：不管内核那边接下来会不会出问题，先把系统代理设置清掉，
+        // 这样哪怕后面 stopHttp() 崩了，也只是这一次没关成功，
+        // 不会出现全电视所有App都没网这种大范围故障。
+        clearSystemProxy(context)
         if (httpStarted) {
             try {
                 Clash.stopHttp()
@@ -73,6 +79,7 @@ object ProxyManager {
             httpStarted = false
         }
         clearSystemProxy(context)
+        killCachedAppProcesses(context)
     }
 
     fun isRunning(): Boolean = httpStarted
@@ -155,6 +162,30 @@ object ProxyManager {
             Settings.Global.putString(resolver, "global_proxy_pac_url", null)
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+    /**
+     * 关代理时顺手清一遍后台App进程，效果等价于"重启"——
+     * 因为系统的 PROXY_CHANGE_ACTION 广播只有系统自己能发，
+     * 我们的App没权限通知其他App"代理变了"，
+     * 只能靠让它们的进程重新拉起，才会重新读取当前真实的代理状态。
+     */
+    private fun killCachedAppProcesses(context: Context) {
+        try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val pm = context.packageManager
+            for (appInfo in pm.getInstalledApplications(0)) {
+                if (appInfo.packageName == context.packageName) continue
+                // 跳过没被改过的系统原生App，避免误杀系统关键进程
+                val isUntouchedSystemApp =
+                    (appInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0) &&
+                            (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP == 0)
+                if (isUntouchedSystemApp) continue
+
+                am.killBackgroundProcesses(appInfo.packageName)
+            }
+        } catch (e: Exception) {
+            // 清理失败不影响主流程，代理设置本身已经清除干净了
         }
     }
 }

@@ -10,8 +10,8 @@ android {
         applicationId = "com.tvip.proxy"
         minSdk = 24
         targetSdk = 33
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
     }
 
     compileSdk = 34
@@ -58,5 +58,4 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-    implementation("com.github.bumptech.glide:glide:4.16.0")
 }

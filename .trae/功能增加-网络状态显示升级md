@@ -1,0 +1,44 @@
+首次进入后显示失败，后面连接代理再取消才成功，2当前状态让我改主意了，当点击卡片时展开不变，不过此时由于显示问题，我希望向下选择滑动时同样可以作用于底下详细测试中的各个国内外站点（上层的banner不动），可以选中这些站点，直到收起才会其他层的页面滑动，否则会导致看不全的现象
+我先把“首次进入失败”和“展开后二级详情的焦点/滚动”这两块一起看一下。重点会放在 TV 遥控器焦点链路上，避免只是视觉展开了，但 D-pad 还在往下面大页面跑。
+        
+            
+toolName: Shell
+            
+status: success
+          
+          
+
+        
+            
+toolName: Shell
+            
+status: success
+          
+          
+
+        
+            
+toolName: Shell
+            
+status: success
+          
+          
+我准备再补两层稳妥处理：一层是“首次进入自动重试一次”，避免冷启动时直接把失败刷出来；另一层是把二级详情区做成真正可聚焦、可内部滚动的 TV 区域，并在展开时暂时锁住下面主内容的焦点。
+        
+            
+toolName: apply_patch
+            
+status: interrupted
+          
+          
+
+        
+            
+toolName: edit_file_update
+            
+status: success
+          
+            
+filePath: d:\typer\cursor project\tvproxy_app\app\src\main\res\layout\activity_main.xml
+          
+changes: 请求限流，请稍后重试 (4008)
